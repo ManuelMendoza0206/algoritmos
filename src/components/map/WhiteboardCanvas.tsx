@@ -4,13 +4,11 @@ import {
   PlusCircle,
   Truck,
   RotateCcw,
-  Sparkles,
-  Layers,
   Clock,
   Compass,
   AlertCircle
 } from 'lucide-react'
-import type { Brigade, Incident, DispatchOutcome, Point } from '../../types/dispatch.ts'
+import type { Brigade, Incident, DispatchOutcome, Point, DispatchAssignment } from '../../types/dispatch.ts'
 import { getPriorityStyle } from '../../utils/priorityStyles.ts'
 
 export type WhiteboardTool = 'select' | 'add-incident' | 'add-brigade'
@@ -46,6 +44,12 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
     type: 'brigade' | 'incident'
     id: string
   } | null>(null)
+
+  // Map of incident ID to assignment details
+  const assignmentMap = new Map<string, DispatchAssignment>()
+  outcome.assignments.forEach((a) => {
+    assignmentMap.set(a.incidentId, a)
+  })
 
   // Calculate percentage coordinates from clientX, clientY
   const getCoordinatesFromEvent = useCallback((e: MouseEvent | React.MouseEvent): Point => {
@@ -113,7 +117,7 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
   }, [draggingEntity, getCoordinatesFromEvent, onUpdateBrigadeLocation, onUpdateIncidentLocation])
 
   return (
-    <div className="flex flex-col bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden h-[640px] relative select-none">
+    <div className="flex flex-col bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden h-[660px] relative select-none">
       {/* Interactive Top Action Bar */}
       <div className="px-5 py-3 border-b border-slate-200 bg-white/95 backdrop-blur flex flex-wrap items-center justify-between gap-3 z-30">
         {/* Left: Tools Selector */}
@@ -155,14 +159,18 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
           </button>
         </div>
 
-        {/* Right: Quick actions & Instructions */}
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-500 font-medium hidden md:inline-flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            {activeTool === 'select'
-              ? 'Arrastra cualquier unidad o incidencia libremente por la pizarra'
-              : 'Haz clic en cualquier punto de la pizarra para colocar el elemento'}
-          </span>
+        {/* Right: Quick actions & Legend */}
+        <div className="flex items-center gap-3 text-xs">
+          <div className="hidden sm:flex items-center gap-3 text-[11px] font-medium text-slate-500">
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" />
+              Parada 1 (Inmediata)
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
+              Parada 2 (En Cola)
+            </span>
+          </div>
 
           <button
             onClick={onResetScenario}
@@ -183,7 +191,7 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
           activeTool !== 'select' ? 'cursor-crosshair' : 'cursor-default'
         }`}
       >
-        {/* Subtle Watermark Sector Labels */}
+        {/* Sector Labels */}
         <div className="absolute inset-0 pointer-events-none p-6 flex flex-col justify-between text-[11px] font-bold text-slate-300 uppercase tracking-widest">
           <div className="flex justify-between">
             <span className="flex items-center gap-1.5"><Compass className="w-3.5 h-3.5" /> Distrito Norte / Médico</span>
@@ -202,32 +210,32 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
           preserveAspectRatio="none"
         >
           {outcome.assignments.map((assignment, index) => {
-            const b = assignment.brigade.location
-            const inc = assignment.incident.location
-            const isSmart = outcome.mode === 'smart'
-            const strokeColor = isSmart ? '#2563eb' : '#d97706'
+            const pFrom = assignment.fromLocation
+            const pTo = assignment.incident.location
+            const isStop1 = assignment.stopOrder === 1
+            const strokeColor = isStop1 ? '#2563eb' : '#d97706'
 
             return (
               <g key={`vector-${index}`}>
-                {/* Thick subtle shadow line */}
+                {/* Glow/Shadow Line */}
                 <line
-                  x1={b.x}
-                  y1={b.y}
-                  x2={inc.x}
-                  y2={inc.y}
+                  x1={pFrom.x}
+                  y1={pFrom.y}
+                  x2={pTo.x}
+                  y2={pTo.y}
                   stroke={strokeColor}
                   strokeWidth="0.8"
-                  strokeOpacity="0.2"
+                  strokeOpacity="0.25"
                 />
-                {/* Sharp animated dispatch line */}
+                {/* Active Animated Line */}
                 <line
-                  x1={b.x}
-                  y1={b.y}
-                  x2={inc.x}
-                  y2={inc.y}
+                  x1={pFrom.x}
+                  y1={pFrom.y}
+                  x2={pTo.x}
+                  y2={pTo.y}
                   stroke={strokeColor}
                   strokeWidth="0.5"
-                  strokeDasharray="2, 1.5"
+                  strokeDasharray={isStop1 ? '2, 1.5' : '1.5, 1'}
                 />
               </g>
             )
@@ -236,11 +244,11 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
 
         {/* Floating ETA and Distance Badges on Vector Midpoints */}
         {outcome.assignments.map((assignment, index) => {
-          const b = assignment.brigade.location
-          const inc = assignment.incident.location
-          const midX = (b.x + inc.x) / 2
-          const midY = (b.y + inc.y) / 2
-          const isSmart = outcome.mode === 'smart'
+          const pFrom = assignment.fromLocation
+          const pTo = assignment.incident.location
+          const midX = (pFrom.x + pTo.x) / 2
+          const midY = (pFrom.y + pTo.y) / 2
+          const isStop1 = assignment.stopOrder === 1
 
           return (
             <div
@@ -249,15 +257,19 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
               style={{ left: `${midX}%`, top: `${midY}%` }}
             >
               <div
-                className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold shadow-md flex items-center gap-1.5 border ${
-                  isSmart
+                className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold shadow-md flex items-center gap-1 border ${
+                  isStop1
                     ? 'bg-blue-600 text-white border-blue-500 shadow-blue-500/20'
                     : 'bg-amber-600 text-white border-amber-500 shadow-amber-500/20'
                 }`}
               >
                 <Clock className="w-3 h-3" />
-                <span>{assignment.etaMinutes} min</span>
-                <span className="opacity-80 text-[10px]">({assignment.distanceKm} km)</span>
+                <span>
+                  {isStop1
+                    ? `Parada 1: ${assignment.etaMinutes} min`
+                    : `Parada 2: +${assignment.etaMinutes} min · ${assignment.cumulativeEtaMinutes} min total`}
+                </span>
+                <span className="opacity-80 text-[9px]">({assignment.distanceKm} km)</span>
               </div>
             </div>
           )
@@ -271,7 +283,7 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
             <div
               key={brigade.id}
               onPointerDown={(e) => handleStartDrag(e, 'brigade', brigade.id)}
-              className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-25 transition-transform ${
+              className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-[25] transition-transform ${
                 isDragging ? 'cursor-grabbing scale-110 shadow-2xl z-40' : 'cursor-grab hover:scale-105'
               }`}
               style={{ left: `${brigade.location.x}%`, top: `${brigade.location.y}%` }}
@@ -294,6 +306,7 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
           const isSelected = incident.id === selectedIncidentId
           const isDragging = draggingEntity?.type === 'incident' && draggingEntity?.id === incident.id
           const style = getPriorityStyle(incident.mamdani.level)
+          const assign = assignmentMap.get(incident.id)
 
           return (
             <div
@@ -305,13 +318,13 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
               }}
               className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-30 transition-transform ${
                 isDragging
-                  ? 'cursor-grabbing scale-115 shadow-2xl z-40'
+                  ? 'cursor-grabbing scale-[1.15] shadow-2xl z-40'
                   : 'cursor-grab hover:scale-105'
               }`}
               style={{ left: `${incident.location.x}%`, top: `${incident.location.y}%` }}
             >
               <div
-                className={`bg-white rounded-xl border-2 shadow-md p-2 flex items-center gap-2 min-w-[145px] transition-all ${
+                className={`bg-white rounded-xl border-2 shadow-md p-2 flex items-center gap-2 min-w-[160px] transition-all ${
                   isSelected ? 'ring-2 ring-slate-800 ring-offset-2' : ''
                 }`}
                 style={{ borderColor: style.fillColor }}
@@ -324,10 +337,25 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
                 </div>
                 <div className="overflow-hidden leading-tight flex-1">
                   <p className="text-xs font-bold text-slate-800 truncate">{incident.title}</p>
-                  <div className="flex items-center justify-between text-[10px] mt-0.5">
-                    <span className="font-mono text-slate-500 font-semibold">{incident.code}</span>
+                  
+                  {/* Status & Priority Badge */}
+                  <div className="flex items-center justify-between text-[10px] mt-1">
+                    {assign ? (
+                      <span
+                        className={`font-semibold px-1.5 py-0.2 rounded text-[9px] ${
+                          assign.stopOrder === 1
+                            ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                            : 'bg-amber-100 text-amber-900 border border-amber-200'
+                        }`}
+                      >
+                        {assign.stopOrder === 1 ? 'Parada 1 (Inmediata)' : 'Parada 2 (En cola)'}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 font-medium">En espera</span>
+                    )}
+
                     <span
-                      className="font-bold px-1 py-0.2 rounded"
+                      className="font-bold px-1.5 py-0.2 rounded font-mono"
                       style={{ backgroundColor: `${style.fillColor}18`, color: style.fillColor }}
                     >
                       {incident.mamdani.score}
@@ -342,23 +370,25 @@ export const WhiteboardCanvas: React.FC<WhiteboardCanvasProps> = ({
 
       {/* Bottom Summary Bar */}
       <div className="px-5 py-2.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs text-slate-600">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
           <span className="flex items-center gap-1.5 font-medium">
             <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" />
-            Unidades de Rescate: <strong className="text-slate-800 font-mono">{brigades.length}</strong>
+            Paradas Inmediatas: <strong className="text-slate-800 font-mono">{outcome.immediateAssignments.length}</strong>
           </span>
           <span className="flex items-center gap-1.5 font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-            Incidencias: <strong className="text-slate-800 font-mono">{incidents.length}</strong>
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" />
+            Paradas en Cola: <strong className="text-slate-800 font-mono">{outcome.queuedAssignments.length}</strong>
           </span>
-          <span className="flex items-center gap-1.5 font-medium">
-            <Layers className="w-3.5 h-3.5 text-slate-400" />
-            Emparejamientos Activos: <strong className="text-slate-800 font-mono">{outcome.assignments.length}</strong>
-          </span>
+          {outcome.unassignedIncidents.length > 0 && (
+            <span className="flex items-center gap-1.5 font-medium text-rose-600">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+              Sin asignar: <strong className="font-mono">{outcome.unassignedIncidents.length}</strong>
+            </span>
+          )}
         </div>
 
         <div className="text-slate-500 text-[11px] font-medium">
-          Modo: <strong className="text-slate-800">{outcome.mode === 'smart' ? 'Inteligente (Mamdani + Húngaro)' : 'Clásico (Solo Distancia)'}</strong>
+          Rutas multi-parada activas automáticas cuando <strong className="text-slate-800">M &lt; N</strong>
         </div>
       </div>
     </div>

@@ -1,21 +1,33 @@
 import { useState, useMemo, useCallback } from 'react'
 import { Navbar, type NavTab } from './components/layout/Navbar.tsx'
+import { LandingPage } from './components/landing/LandingPage.tsx'
 import { WhiteboardCanvas } from './components/map/WhiteboardCanvas.tsx'
 import { WhiteboardSidebar } from './components/inputs/WhiteboardSidebar.tsx'
 import { MamdaniInspector } from './components/inspector/MamdaniInspector.tsx'
 import { HungarianInspector } from './components/inspector/HungarianInspector.tsx'
 import { ComparisonView } from './components/comparison/ComparisonView.tsx'
 import { MathModal } from './components/modal/MathModal.tsx'
-import { PRESET_SCENARIOS, type ScenarioPreset } from './data/presets.ts'
+import { PRESET_SCENARIOS } from './data/presets.ts'
 import { evaluateMamdani } from './algorithms/fuzzy/mamdaniEngine.ts'
 import { runDispatchEngine } from './algorithms/dispatch/dispatchEngine.ts'
 import type { DispatchMode, Incident, Brigade, Point } from './types/dispatch.ts'
+import { Info, Sparkles, X } from 'lucide-react'
 
-export function App() {
-  const [activeTab, setActiveTab] = useState<NavTab>('whiteboard')
+/** Next free numeric suffix for ids like I3 / B7, so deletion never causes collisions. */
+function nextSequence(ids: string[]): number {
+  return (
+    ids.reduce((max, id) => {
+      const match = id.match(/(\d+)$/)
+      return match ? Math.max(max, Number(match[1])) : max
+    }, 0) + 1
+  )
+}
+
+export function App() {  const [activeTab, setActiveTab] = useState<NavTab>('landing')
   const [activePresetId, setActivePresetId] = useState<string>('falla-critica')
   const [mode, setMode] = useState<DispatchMode>('smart')
   const [isMathModalOpen, setIsMathModalOpen] = useState<boolean>(false)
+  const [showGuides, setShowGuides] = useState<boolean>(true)
 
   // Current Preset Initial Data
   const currentPreset = useMemo(() => {
@@ -69,6 +81,13 @@ export function App() {
     []
   )
 
+  // Handle Custom Incident Title Update
+  const handleUpdateIncidentTitle = useCallback((id: string, title: string) => {
+    setIncidents((prev) =>
+      prev.map((inc) => (inc.id === id ? { ...inc, title } : inc))
+    )
+  }, [])
+
   // Handle Dragging Brigade
   const handleUpdateBrigadeLocation = useCallback((id: string, location: Point) => {
     setBrigades((prev) =>
@@ -86,13 +105,13 @@ export function App() {
   // Handle Adding Incident on Whiteboard Click
   const handleAddIncidentAt = useCallback(
     (location: Point) => {
-      const nextNum = incidents.length + 1
-      const newId = `INC-${Date.now().toString().slice(-4)}`
+      const n = nextSequence(incidents.map((i) => i.id))
+      const code = `INC-${String(n).padStart(2, '0')}`
       const defaultInputs = { severity: 6.5, impact: 6.0, waitTime: 45 }
       const newInc: Incident = {
-        id: newId,
-        code: `INC-0${nextNum}`,
-        title: `Incidencia ${nextNum}`,
+        id: `I${n}`,
+        code,
+        title: `Incidencia ${n}`,
         sector: 'Zona Urbana Central',
         location,
         severity: defaultInputs.severity,
@@ -102,20 +121,20 @@ export function App() {
       }
 
       setIncidents((prev) => [...prev, newInc])
-      setSelectedIncidentId(newId)
+      setSelectedIncidentId(newInc.id)
     },
-    [incidents.length]
+    [incidents]
   )
 
   // Handle Adding Brigade on Whiteboard Click
   const handleAddBrigadeAt = useCallback(
     (location: Point) => {
-      const nextNum = brigades.length + 1
-      const newId = `B${nextNum}`
+      const n = nextSequence(brigades.map((b) => b.id))
+      const label = String(n).padStart(2, '0')
       const newBrigade: Brigade = {
-        id: newId,
-        code: `B-0${nextNum}`,
-        name: `Unidad de Rescate 0${nextNum}`,
+        id: `B${n}`,
+        code: `U-${label}`,
+        name: `Unidad ${label}`,
         location,
         specialty: 'Soporte Vital',
         speedKmH: 48,
@@ -123,7 +142,7 @@ export function App() {
       }
       setBrigades((prev) => [...prev, newBrigade])
     },
-    [brigades.length]
+    [brigades]
   )
 
   // Handle Quick Add Incident from Sidebar
@@ -183,63 +202,133 @@ export function App() {
         onToggleMode={setMode}
         outcome={dispatchOutcome}
         onOpenMathModal={() => setIsMathModalOpen(true)}
+        showGuides={showGuides}
+        onToggleGuides={() => setShowGuides((prev) => !prev)}
       />
 
       {/* Main Surface View Container */}
-      <main className="flex-1 max-w-[1700px] w-full mx-auto p-4 sm:p-6">
-        {activeTab === 'whiteboard' && (
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-            {/* Left: Quick Incident Sliders & Entities Drawer (4 Cols) */}
-            <aside className="xl:col-span-4 flex flex-col gap-4">
-              <WhiteboardSidebar
-                incidents={incidents}
-                brigades={brigades}
-                selectedIncidentId={selectedIncidentId}
-                onSelectIncident={setSelectedIncidentId}
-                onUpdateIncidentInputs={handleUpdateIncidentInputs}
-                onAddIncident={handleAddIncident}
-                onDeleteIncident={handleDeleteIncident}
-                onAddBrigade={handleAddBrigade}
-                onDeleteBrigade={handleDeleteBrigade}
-              />
-            </aside>
+      <main className="flex-1 w-full">
+        {/* Landing Page View */}
+        {activeTab === 'landing' && (
+          <LandingPage
+            onStartSimulation={() => setActiveTab('whiteboard')}
+            onOpenMath={() => setIsMathModalOpen(true)}
+          />
+        )}
 
-            {/* Right: Spacious Whiteboard Canvas (8 Cols) */}
-            <section className="xl:col-span-8 flex flex-col gap-4">
-              <WhiteboardCanvas
-                brigades={brigades}
-                incidents={incidents}
-                outcome={dispatchOutcome}
-                selectedIncidentId={selectedIncidentId}
-                onSelectIncident={setSelectedIncidentId}
-                onUpdateBrigadeLocation={handleUpdateBrigadeLocation}
-                onUpdateIncidentLocation={handleUpdateIncidentLocation}
-                onAddIncidentAt={handleAddIncidentAt}
-                onAddBrigadeAt={handleAddBrigadeAt}
-                onResetScenario={handleResetScenario}
-              />
-            </section>
+        {activeTab !== 'landing' && (
+        <div className="max-w-[1700px] w-full mx-auto p-4 sm:p-6">
+        {/* Whiteboard Interactive View */}
+        {activeTab === 'whiteboard' && (
+          <div className="flex flex-col gap-4">
+            {/* Context Guide Callout Banner */}
+            {showGuides && (
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start justify-between gap-3 text-xs text-blue-900">
+                <div className="flex items-start gap-2.5">
+                  <Sparkles className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Guía de la Pizarra:</strong> Puedes arrastrar libremente cualquier unidad o incidencia con el ratón. En el panel izquierdo puedes cambiarles el nombre ("Incidencia 1", etc.) y mover los sliders de Gravedad y Tiempo de espera. Si hay más incidencias que unidades, el sistema trazará automáticamente las <strong>rutas secuenciales (Parada 1 ➔ Parada 2)</strong>.
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowGuides(false)}
+                  className="text-blue-400 hover:text-blue-700 p-1"
+                  title="Cerrar guía"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+              {/* Left: Quick Incident Sliders & Entities Drawer (4 Cols) */}
+              <aside className="xl:col-span-4 flex flex-col gap-4">
+                <WhiteboardSidebar
+                  incidents={incidents}
+                  brigades={brigades}
+                  selectedIncidentId={selectedIncidentId}
+                  onSelectIncident={setSelectedIncidentId}
+                  onUpdateIncidentInputs={handleUpdateIncidentInputs}
+                  onUpdateIncidentTitle={handleUpdateIncidentTitle}
+                  onAddIncident={handleAddIncident}
+                  onDeleteIncident={handleDeleteIncident}
+                  onAddBrigade={handleAddBrigade}
+                  onDeleteBrigade={handleDeleteBrigade}
+                />
+              </aside>
+
+              {/* Right: Spacious Whiteboard Canvas (8 Cols) */}
+              <section className="xl:col-span-8 flex flex-col gap-4">
+                <WhiteboardCanvas
+                  brigades={brigades}
+                  incidents={incidents}
+                  outcome={dispatchOutcome}
+                  selectedIncidentId={selectedIncidentId}
+                  onSelectIncident={setSelectedIncidentId}
+                  onUpdateBrigadeLocation={handleUpdateBrigadeLocation}
+                  onUpdateIncidentLocation={handleUpdateIncidentLocation}
+                  onAddIncidentAt={handleAddIncidentAt}
+                  onAddBrigadeAt={handleAddBrigadeAt}
+                  onResetScenario={handleResetScenario}
+                />
+              </section>
+            </div>
           </div>
         )}
 
+        {/* Mamdani View */}
         {activeTab === 'mamdani' && selectedIncident && (
-          <MamdaniInspector
-            incident={selectedIncident}
-            allIncidents={incidents}
-            onSelectIncident={setSelectedIncidentId}
-          />
+          <div className="flex flex-col gap-4">
+            {showGuides && (
+              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-start justify-between gap-3 text-xs text-purple-900 max-w-[1500px] mx-auto w-full">
+                <div className="flex items-start gap-2.5">
+                  <Info className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Guía de Mamdani:</strong> Las gráficas superiores muestran en qué función de pertenencia cae el valor del deslizador (línea vertical). El gráfico inferior muestra el área sombreada combinada y la línea roja vertical del <strong>Centroide (y*)</strong> que define el puntaje exacto de 0 a 100.
+                  </div>
+                </div>
+                <button onClick={() => setShowGuides(false)} className="text-purple-400 hover:text-purple-700 p-1">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            <MamdaniInspector
+              incident={selectedIncident}
+              allIncidents={incidents}
+              onSelectIncident={setSelectedIncidentId}
+            />
+          </div>
         )}
 
+        {/* Hungarian View */}
         {activeTab === 'hungarian' && (
-          <HungarianInspector
-            outcome={dispatchOutcome}
-            brigades={brigades}
-            incidents={incidents}
-          />
+          <div className="flex flex-col gap-4">
+            {showGuides && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start justify-between gap-3 text-xs text-emerald-900 max-w-[1500px] mx-auto w-full">
+                <div className="flex items-start gap-2.5">
+                  <Info className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Guía del Algoritmo Húngaro:</strong> Haz clic en cualquier celda para ver la fórmula desglosada (ETA multiplicado por el factor de riesgo de la incidencia). Las celdas verdes representan la asignación óptima que minimiza la suma global de costos. Abajo verás las rutas que quedaron en la Parada 2.
+                  </div>
+                </div>
+                <button onClick={() => setShowGuides(false)} className="text-emerald-400 hover:text-emerald-700 p-1">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+            <HungarianInspector
+              outcome={dispatchOutcome}
+              brigades={brigades}
+              incidents={incidents}
+            />
+          </div>
         )}
 
+        {/* Comparison View */}
         {activeTab === 'comparison' && (
           <ComparisonView brigades={brigades} incidents={incidents} />
+        )}
+        </div>
         )}
       </main>
 

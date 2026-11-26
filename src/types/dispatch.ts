@@ -35,25 +35,30 @@ export interface DispatchAssignment {
   brigade: Brigade
   incidentId: string
   incident: Incident
-  distanceKm: number
-  etaMinutes: number
-  cellCost: number
-  distanceCost: number
-  urgencyCost: number
+  stopOrder: 1 | 2       // 1 = Parada Inmediata, 2 = En Cola Secuencial
+  fromLocation: Point    // Origin of this leg (Brigade location or Stop 1 incident location)
+  distanceKm: number     // Length of this leg only
+  etaMinutes: number     // Travel time of this leg only
+  cumulativeEtaMinutes: number // Arrival time since dispatch, including service time
+  cellCost: number       // Cost used by the Hungarian solver for this leg
 }
 
 export interface DispatchOutcome {
   mode: DispatchMode
   assignments: DispatchAssignment[]
+  immediateAssignments: DispatchAssignment[] // Stop 1
+  queuedAssignments: DispatchAssignment[]    // Stop 2
   unassignedIncidents: Incident[]
   unassignedBrigades: Brigade[]
   costMatrix: number[][]
   distanceMatrix: number[][]
   hungarian: HungarianResult
   kpis: {
-    avgEtaMinutes: number
-    criticalCoveragePercent: number
-    globalCostIndex: number
+    avgEtaMinutes: number          // Mean arrival time across every served incident
+    criticalEtaMinutes: number     // Mean arrival time for Alta / Crítica incidents
+    criticalCoveragePercent: number // Critical incidents served at stop 1
+    globalCostIndex: number        // Sum of both Hungarian stages
     totalDistanceKm: number
+    queuedIncidentsCount: number
   }
 }

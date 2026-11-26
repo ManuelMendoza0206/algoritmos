@@ -4,7 +4,7 @@ import { SEVERITY_SETS, IMPACT_SETS, WAIT_TIME_SETS } from '../../algorithms/fuz
 import { evaluateMembership } from '../../algorithms/fuzzy/membership.ts'
 import type { FuzzySetDefinition } from '../../algorithms/fuzzy/types.ts'
 import { getPriorityStyle } from '../../utils/priorityStyles.ts'
-import { Sliders, Cpu, CheckCircle } from 'lucide-react'
+import { Cpu } from 'lucide-react'
 
 interface MamdaniInspectorProps {
   incident: Incident

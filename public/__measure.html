@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <body>
+    <iframe id="f" src="/" style="width: 390px; height: 900px; border: 0"></iframe>
+    <pre id="out">measuring…</pre>
+    <script>
+      const f = document.getElementById('f')
+      f.onload = () => {
+        setTimeout(() => {
+          const d = f.contentDocument
+          const root = d.documentElement
+          const wide = [...d.querySelectorAll('*')]
+            .map((el) => ({ el, r: el.getBoundingClientRect() }))
+            .filter((x) => x.r.right > 391 && x.r.width > 0)
+            .slice(0, 30)
+            .map(
+              (x) =>
+                x.el.tagName +
+                ' | ' +
+                String(x.el.className).slice(0, 80) +
+                ' | right=' +
+                Math.round(x.r.right) +
+                ' w=' +
+                Math.round(x.r.width)
+            )
+          document.getElementById('out').textContent =
+            'scrollWidth=' +
+            root.scrollWidth +
+            ' clientWidth=' +
+            root.clientWidth +
+            '\n' +
+            wide.join('\n')
+        }, 1500)
+      }
+    </script>
+  </body>
+</html>

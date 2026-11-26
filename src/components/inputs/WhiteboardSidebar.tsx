@@ -7,8 +7,7 @@ import {
   Trash2,
   Truck,
   AlertCircle,
-  MapPin,
-  ChevronRight
+  MapPin
 } from 'lucide-react'
 import type { Incident, Brigade } from '../../types/dispatch.ts'
 import { getPriorityStyle } from '../../utils/priorityStyles.ts'
@@ -19,6 +18,7 @@ interface WhiteboardSidebarProps {
   selectedIncidentId: string | null
   onSelectIncident: (id: string) => void
   onUpdateIncidentInputs: (id: string, inputs: { severity: number; impact: number; waitTime: number }) => void
+  onUpdateIncidentTitle: (id: string, title: string) => void
   onAddIncident: () => void
   onDeleteIncident: (id: string) => void
   onAddBrigade: () => void
@@ -31,6 +31,7 @@ export const WhiteboardSidebar: React.FC<WhiteboardSidebarProps> = ({
   selectedIncidentId,
   onSelectIncident,
   onUpdateIncidentInputs,
+  onUpdateIncidentTitle,
   onAddIncident,
   onDeleteIncident,
   onAddBrigade,
@@ -44,20 +45,28 @@ export const WhiteboardSidebar: React.FC<WhiteboardSidebarProps> = ({
       {/* Selected Incident Editor Card */}
       {selected && pStyle && (
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-4">
-          <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Parámetros Difusos
+          <div className="flex items-start justify-between border-b border-slate-100 pb-3 gap-2">
+            <div className="flex-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                Nombre de la Incidencia:
               </span>
-              <h3 className="text-sm font-bold text-slate-900 mt-0.5">{selected.title}</h3>
-              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={selected.title}
+                  onChange={(e) => onUpdateIncidentTitle(selected.id, e.target.value)}
+                  placeholder="Ej: Incidencia 1"
+                  className="font-bold text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 w-full focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-1.5">
                 <MapPin className="w-3 h-3 text-slate-400" />
-                Coord: ({selected.location.x}, {selected.location.y}) • {selected.sector}
+                Coord: ({selected.location.x}, {selected.location.y}) • {selected.code}
               </p>
             </div>
 
-            <div className="text-right">
-              <span className="text-[10px] text-slate-400 block font-medium">Puntaje Mamdani</span>
+            <div className="text-right shrink-0">
+              <span className="text-[10px] text-slate-400 block font-medium">Prioridad Mamdani</span>
               <span
                 className="text-base font-bold font-mono px-2.5 py-0.5 rounded-lg border inline-block mt-0.5 shadow-xs"
                 style={{
@@ -178,7 +187,7 @@ export const WhiteboardSidebar: React.FC<WhiteboardSidebarProps> = ({
         <div className="flex items-center justify-between mb-3">
           <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
             <AlertCircle className="w-4 h-4 text-rose-500" />
-            Incidencias en Pizarra ({incidents.length})
+            Incidencias ({incidents.length})
           </span>
           <button
             onClick={onAddIncident}
@@ -268,12 +277,11 @@ export const WhiteboardSidebar: React.FC<WhiteboardSidebarProps> = ({
                 </div>
                 <div>
                   <span className="font-semibold text-slate-800 block">{b.name}</span>
-                  <span className="text-[10px] text-blue-600 font-medium">{b.specialty}</span>
+                  <span className="text-[10px] text-blue-600 font-medium">{b.speedKmH} km/h</span>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-right">
                 <div>
-                  <span className="font-mono font-bold text-slate-800 text-xs block">{b.speedKmH} km/h</span>
                   <span className="text-slate-400 text-[10px]">({b.location.x}, {b.location.y})</span>
                 </div>
                 {brigades.length > 1 && (

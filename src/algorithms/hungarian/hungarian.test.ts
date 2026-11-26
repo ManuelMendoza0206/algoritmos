@@ -1,28 +1,56 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
 import { solveHungarian } from './hungarianAlgorithm.ts'
 
-// Benchmark 1: Classic 3x3 test
-const matrix3x3 = [
-  [15, 40, 45],
-  [20, 60, 35],
-  [20, 40, 25],
-]
+function assertUniqueAssignment(assignments: [number, number][]) {
+  const rows = new Set(assignments.map(([r]) => r))
+  const cols = new Set(assignments.map(([, c]) => c))
+  assert.equal(rows.size, assignments.length, 'each row is used once')
+  assert.equal(cols.size, assignments.length, 'each column is used once')
+}
 
-const result1 = solveHungarian(matrix3x3)
-console.log('Result 3x3 Total Cost:', result1.totalCost)
-console.log('Assignments:', result1.assignments)
-// Expected optimal: (0,0)=15, (1,2)=35, (2,1)=40 => Total = 90 (or (0,1)=40, (1,0)=20, (2,2)=25 => Total = 85)
-// Let's verify:
-// (0,0)=15, (1,2)=35, (2,1)=40 -> 15+35+40 = 90
-// (0,1)=40, (1,0)=20, (2,2)=25 -> 40+20+25 = 85 (optimal is 85!)
+test('solves a known 3x3 assignment to its minimum cost', () => {
+  const result = solveHungarian([
+    [15, 40, 45],
+    [20, 60, 35],
+    [20, 40, 25],
+  ])
 
-// Benchmark 2: 4x4 matrix
-const matrix4x4 = [
-  [9, 2, 7, 8],
-  [6, 4, 3, 7],
-  [5, 8, 1, 8],
-  [7, 6, 9, 4],
-]
-const result2 = solveHungarian(matrix4x4)
-console.log('Result 4x4 Total Cost:', result2.totalCost)
-console.log('Assignments 4x4:', result2.assignments)
-// Expected optimal: (0,1)=2, (1,0)=6, (2,2)=1, (3,3)=4 => 2 + 6 + 1 + 4 = 13!
+  assert.equal(result.totalCost, 85)
+  assertUniqueAssignment(result.assignments)
+})
+
+test('solves a known 4x4 assignment to its minimum cost', () => {
+  const result = solveHungarian([
+    [9, 2, 7, 8],
+    [6, 4, 3, 7],
+    [5, 8, 1, 8],
+    [7, 6, 9, 4],
+  ])
+
+  assert.equal(result.totalCost, 13)
+  assertUniqueAssignment(result.assignments)
+})
+
+test('handles fewer rows than columns without reusing a column', () => {
+  const result = solveHungarian([
+    [4, 1, 3],
+    [2, 0, 5],
+  ])
+
+  assert.equal(result.assignments.length, 2)
+  assertUniqueAssignment(result.assignments)
+  assert.equal(result.totalCost, 3)
+})
+
+test('records the reduction steps for the inspector', () => {
+  const result = solveHungarian([[1, 2], [3, 4]])
+  assert.ok(result.steps.length >= 3)
+  assert.equal(result.steps[0].matrix.length, 2)
+})
+
+test('returns an empty result for an empty matrix', () => {
+  const result = solveHungarian([])
+  assert.deepEqual(result.assignments, [])
+  assert.equal(result.totalCost, 0)
+})
